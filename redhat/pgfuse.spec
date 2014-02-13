@@ -66,6 +66,12 @@
 %define fc19 1
 %define fedora 1
 %endif
+%define fc20 0  
+%if 0%{?fedora_version} == 20
+%define dist fc20
+%define fc20 1
+%define fedora 1
+%endif
 
 %define suse 0
 %if 0%{?suse_version} == 1140
