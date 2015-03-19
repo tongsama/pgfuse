@@ -29,6 +29,34 @@
 %define rhel6 1
 %endif
 
+%if 0%{?centos_version} >= 700 && 0%{?centos_version} <= 799
+%define dist centos7
+%define centos 1
+%define rhel7 1
+%endif
+
+%define scilin 0
+%define scilin5 0
+%if 0%{?scilin_version} >= 500 && 0%{?scilin_version} <= 599
+%define dist scilin5
+%define scilin 1
+%define scilin5 1
+%endif
+
+%define scilin6 0
+%if 0%{?scilin_version} >= 600 && 0%{?scilin_version} <= 699
+%define dist scilin6
+%define scilin 1
+%define scilin6 1
+%endif
+
+%define scilin7 0
+%if 0%{?scilin_version} >= 700 && 0%{?scilin_version} <= 799
+%define dist scilin7
+%define scilin 1
+%define scilin7 1
+%endif
+
 %define fedora 0
 %define fc14 0
 %if 0%{?fedora_version} == 14
@@ -72,14 +100,36 @@
 %define fc20 1
 %define fedora 1
 %endif
+%define fc21 0  
+%if 0%{?fedora_version} == 21
+%define dist fc21
+%define fc21 1
+%define fedora 1
+%endif
 
 %define suse 0
+%define osu114 0
+%define osu121 0
+%define osu122 0
+%define osu131 0
 %if 0%{?suse_version} == 1140
 %define dist osu114
+%define osu114 1
 %define suse 1
 %endif
-%if 0%{?suse_version} > 1140
+%if 0%{?suse_version} == 1210
 %define dist osu121
+%define osu121 1
+%define suse 1
+%endif
+%if 0%{?suse_version} >= 1220
+%define dist osu122
+%define osu122 1
+%define suse 1
+%endif
+%if 0%{?suse_version} >= 1310
+%define dist osu131
+%define osu122 1
 %define suse 1
 %endif
 
@@ -105,7 +155,7 @@ BuildRoot: %{_tmppath}/%{name}-root
 # Build dependencies
 ###
 
-%if %{rhel} || %{centos} || %{fedora}
+%if %{rhel} || %{centos} || %{fedora} || %{scilin}
 BuildRequires: pkgconfig
 %endif
 %if %{suse} || %{sles}
@@ -114,7 +164,7 @@ BuildRequires: pkg-config
 
 BuildRequires: gcc
 
-%if %{rhel} || %{centos} || %{fedora}
+%if %{rhel} || %{centos} || %{fedora} || %{scilin}
 %if %{rhel5}
 BuildRequires: postgresql84-devel
 Requires: postgresql84-libs
