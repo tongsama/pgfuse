@@ -5,6 +5,7 @@
 %define rhel 0
 %define rhel5 0
 %define rhel6 0
+%define rhel7 0
 %if 0%{?rhel_version} >= 500 && 0%{?rhel_version} <= 599
 %define dist rhel5
 %define rhel 1
@@ -15,42 +16,46 @@
 %define rhel 1
 %define rhel6 1
 %endif
+%if 0%{?rhel_version} >= 700 && 0%{?rhel_version} <= 799
+%define dist rhel7
+%define rhel 1
+%define rhel7 1
+%endif
 
 %define centos 0
+%define centos5 0
+%define centos6 0
+%define centos7 0
 %if 0%{?centos_version} >= 500 && 0%{?centos_version} <= 599
 %define dist centos5
 %define centos 1
-%define rhel5 1
+%define centos5 1
 %endif
-
 %if 0%{?centos_version} >= 600 && 0%{?centos_version} <= 699
 %define dist centos6
 %define centos 1
-%define rhel6 1
+%define centos6 1
 %endif
-
 %if 0%{?centos_version} >= 700 && 0%{?centos_version} <= 799
 %define dist centos7
 %define centos 1
-%define rhel7 1
+%define centos7 1
 %endif
 
 %define scilin 0
 %define scilin5 0
+%define scilin6 0
+%define scilin7 0
 %if 0%{?scilin_version} >= 500 && 0%{?scilin_version} <= 599
 %define dist scilin5
 %define scilin 1
 %define scilin5 1
 %endif
-
-%define scilin6 0
 %if 0%{?scilin_version} >= 600 && 0%{?scilin_version} <= 699
 %define dist scilin6
 %define scilin 1
 %define scilin6 1
 %endif
-
-%define scilin7 0
 %if 0%{?scilin_version} >= 700 && 0%{?scilin_version} <= 799
 %define dist scilin7
 %define scilin 1
@@ -129,7 +134,7 @@
 %endif
 %if 0%{?suse_version} >= 1310
 %define dist osu131
-%define osu122 1
+%define osu131 1
 %define suse 1
 %endif
 
@@ -165,7 +170,7 @@ BuildRequires: pkg-config
 BuildRequires: gcc
 
 %if %{rhel} || %{centos} || %{fedora} || %{scilin}
-%if %{rhel5}
+%if %{rhel5} || %{centos5} || %{scilin5}
 BuildRequires: postgresql84-devel
 Requires: postgresql84-libs
 %else

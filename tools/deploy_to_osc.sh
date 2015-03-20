@@ -14,3 +14,5 @@ CHKSUM=`md5sum $OSC_HOME/${PACKAGE_NAME}_${PACKAGE_VERSION}.tar.gz  | cut -f 1 -
 
 cat tools/$PACKAGE_NAME.dsc > $OSC_HOME/$PACKAGE_NAME.dsc
 echo " $CHKSUM $SIZE ${PACKAGE_NAME}_${PACKAGE_VERSION}.tar.gz" >> $OSC_HOME/$PACKAGE_NAME.dsc
+
+echo "md5sums=('$CHKSUM')" >> $OSC_HOME/PKGBUILD
