@@ -1598,7 +1598,7 @@ static void print_usage( char* progname )
 		"\n"
 		"Options:\n"
 		"    -o opt,[opt...]        pgfuse options\n"
-		"    -v   --verbose         make libcurl print verbose debug\n"
+		"    -v   --verbose         make FUSE print verbose debug\n"
 		"    -h   --help            print help\n"
 		"    -V   --version         print version\n"
 		"\n"
