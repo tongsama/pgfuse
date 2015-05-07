@@ -6,7 +6,7 @@ BLOCKSIZE = 4096
 
 CFLAGS += -I..
 
-test: testfsync testpgsql testtypes testbigfile
+test: testfsync testpgsql testtypes testbigfile testopen
 	psql < clean.sql
 	psql < ../schema.sql
 	test -d mnt || mkdir mnt
@@ -64,6 +64,8 @@ test: testfsync testpgsql testtypes testbigfile
 	# the more human readable output of statvfs
 	-df -h mnt
 	-df -i mnt
+	# test open/creat and flags
+	-./testopen
 	# END: unmount FUSE file system
 	fusermount -u mnt
 
@@ -72,6 +74,7 @@ clean:
 	rm -f testpgsql testpgsql.o
 	rm -f testtypes testtypes.o
 	rm -f testbigfile testbigfile.o
+	rm -f testopen testopen.o
 	
 testfsync: testfsync.o
 	$(CC) -o testfsync testfsync.o
@@ -96,3 +99,6 @@ testbigfile: testbigfile.o
 
 testbigfile.o: testbigfile.c
 	$(CC) -c $(CFLAGS) -o testbigfile.o testbigfile.c
+
+testbigfile.o: testopen.c
+	$(CC) -c $(CFLAGS) -o testopen.o testopen.c
