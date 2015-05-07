@@ -274,12 +274,15 @@ static char *flags_to_string( int flags )
 	s = (char *)malloc( 100 );
 	if( s == NULL ) return "<memory allocation failed>";
 
-	snprintf( s, 100, "access_mode=%s, flags=%s%s%s%s",
+	snprintf( s, 100, "access_mode=%s, flags=%s%s%s%s%s%s%s",
 		mode_s,
 		( flags & O_CREAT ) ? "O_CREAT " : "",
 		( flags & O_TRUNC ) ? "O_TRUNC " : "",
 		( flags & O_EXCL ) ? "O_EXCL " : "",
-		( flags & O_APPEND ) ? "O_APPEND " : "");
+		( flags & O_NOFOLLOW ) ? "O_NOFOLLOW " : "",
+		( flags & O_CLOEXEC ) ? "O_CLOEXEC " : "",
+		( flags & O_DIRECTORY ) ? "O_DIRECTORY " : "",
+		( flags & O_APPEND ) ? "O_APPEND " : "" );
 	
 	return s;
 }
@@ -323,13 +326,29 @@ static int pgfuse_create( const char *path, mode_t mode, struct fuse_file_info *
 				path, id, THREAD_ID );
 		}
 		
-		if( S_ISDIR(meta.mode ) ) {
+		if( S_ISDIR( meta.mode ) ) {
 			PSQL_ROLLBACK( conn ); RELEASE( conn );
 			return -EISDIR;
 		}
+
+		if( ( fi->flags & O_CREAT ) && (fi->flags & O_EXCL ) ) {
+			PSQL_ROLLBACK( conn ); RELEASE( conn );
+			return -EEXIST;
+		}
 		
-		PSQL_ROLLBACK( conn ); RELEASE( conn );
-		return -EEXIST;
+		res = psql_truncate( conn, data->block_size, id, path, 0 );
+		if( res < 0 ) {
+			PSQL_ROLLBACK( conn ); RELEASE( conn );
+			return res;
+		}
+		
+		meta.size = 0;
+		res = psql_write_meta( conn, id, path, meta );
+		if( res < 0 ) {
+			PSQL_ROLLBACK( conn ); RELEASE( conn );
+			return res;
+		}
+		
 	}
 	
 	copy_path = strdup( path );
