@@ -985,6 +985,7 @@ static int pgfuse_statfs( const char *path, struct statvfs *buf )
 
 	res = psql_get_tablespace_locations( conn, location, &nof_locations, data->verbose );
 	if( res < 0 ) {
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
 		return res;
 	}
 
@@ -1326,11 +1327,13 @@ static int pgfuse_rename( const char *from, const char *to )
 		
 	from_id = psql_read_meta_from_path( conn, from, &from_meta );
 	if( from_id < 0 ) {
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
 		return from_id;
 	}
 		
 	to_id = psql_read_meta_from_path( conn, to, &to_meta );
 	if( to_id < 0 && to_id != -ENOENT ) {
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
 		return to_id;
 	}
 	
@@ -1340,13 +1343,16 @@ static int pgfuse_rename( const char *from, const char *to )
 		if( S_ISREG( to_meta.mode ) ) {
 			if( strcmp( from, to ) == 0 ) {
 				/* source equal to destination? This should succeed */
+				PSQL_ROLLBACK( conn ); RELEASE( conn );
 				return 0;
 			} else {
 				/* otherwise bail out */
+				PSQL_ROLLBACK( conn ); RELEASE( conn );
 				return -EEXIST;
 			}
 		}
 		/* TODO: handle all other cases */
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
 		return -EINVAL;
 	}
 	
