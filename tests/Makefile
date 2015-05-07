@@ -100,5 +100,8 @@ testbigfile: testbigfile.o
 testbigfile.o: testbigfile.c
 	$(CC) -c $(CFLAGS) -o testbigfile.o testbigfile.c
 
-testbigfile.o: testopen.c
+testopen: testopen.o
+	$(CC) -o testopen testopen.o
+
+testopen.o: testopen.c
 	$(CC) -c $(CFLAGS) -o testopen.o testopen.c
