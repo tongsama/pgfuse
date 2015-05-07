@@ -74,7 +74,46 @@ int main( void )
 		return 1;
 	}
 	
-	/* Third one should success and truncate the file */
+	/* Third one should success and append to the file */
+	fd = open( "./mnt/testopen", O_CREAT | O_WRONLY | O_APPEND, S_IRUSR | S_IWUSR );
+	
+	/* check if the file has size 4096 */
+	res = stat( "./mnt/testopen", &s );
+	if( res < 0 ) {
+		perror( "Error stating testopen" );
+		return 1;
+	}
+	if( s.st_size == 4096 ) {
+		// OK
+	} else {
+		fprintf( stderr, "Size of file should be 4096, but is %jd\n", s.st_size );
+		return 1;
+	}
+
+	/* write some more data, this data should be appended */
+	wres = write( fd, buf, 4096 );
+	if( wres != 4096 ) {
+		perror( "Error writing" );
+		(void)close( fd );
+		return 1;
+	}
+
+	(void)close( fd );	
+	
+	/* check if the file has size 2 * 4096 now */
+	res = stat( "./mnt/testopen", &s );
+	if( res < 0 ) {
+		perror( "Error stating testopen" );
+		return 1;
+	}
+	if( s.st_size == 8192 ) {
+		// OK
+	} else {
+		fprintf( stderr, "Size of file should be 8192, but is %jd\n", s.st_size );
+		return 1;
+	}
+	
+	/* Fourth one should success and truncate the file */
 	fd = open( "./mnt/testopen", O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR );
 	(void)close( fd );	
 	
