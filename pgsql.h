@@ -96,6 +96,8 @@ int psql_truncate( PGconn *conn, const size_t block_size, const int64_t id, cons
 
 int psql_rename( PGconn *conn, const int64_t from_id, const int64_t from_parent_id, const int64_t to_parent_id, const char *rename_to, const char *from, const char *to );
 
+int psql_rename_to_existing_file( PGconn *conn, const int64_t from_id, const int64_t to_id, const char *from_path, const char *to_path );
+
 size_t psql_get_block_size( PGconn *conn, const size_t block_size );
 
 int64_t psql_get_fs_blocks_used( PGconn *conn );

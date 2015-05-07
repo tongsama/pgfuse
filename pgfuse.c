@@ -1346,9 +1346,20 @@ static int pgfuse_rename( const char *from, const char *to )
 				PSQL_ROLLBACK( conn ); RELEASE( conn );
 				return 0;
 			} else {
-				/* otherwise bail out */
-				PSQL_ROLLBACK( conn ); RELEASE( conn );
-				return -EEXIST;
+				/* otherwise make source file disappear and
+				 * destination file contain the same data
+				 * as the source one (preferably atomic because
+				 * of rename/lockfile tricks)
+				 */
+				res = psql_rename_to_existing_file( conn, from_id, to_id, from, to );
+				if( res < 0 ) {
+					PSQL_ROLLBACK( conn ); RELEASE( conn );
+					return res;
+				}
+
+				PSQL_COMMIT( conn ); RELEASE( conn );
+
+				return res;
 			}
 		}
 		/* TODO: handle all other cases */

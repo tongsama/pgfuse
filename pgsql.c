@@ -846,6 +846,78 @@ int psql_rollback( PGconn *conn )
 	return 0;
 }
 
+int psql_rename_to_existing_file( PGconn *conn, const int64_t from_id, const int64_t to_id, const char *from_path, const char *to_path )
+{
+	int64_t param1 = htobe64( to_id );
+	int64_t param2 = htobe64( from_id );
+	const char *values[2] = { (char *)&param1, (char *)&param2 };
+	int lengths[2] = { sizeof( param1 ), sizeof( param2 ) };
+	int binary[2] = { 1, 1 };
+	PGresult *res;
+
+	/* first delete the data of the destination file */
+	res = PQexecParams( conn, "DELETE FROM data WHERE dir_id=$1::bigint",
+		1, NULL, values, lengths, binary, 1 );
+
+	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
+		syslog( LOG_ERR, "Error in psql_rename_to_existing_file to remove data of the destination file '%s': %s",
+			to_path, PQerrorMessage( conn ) );
+		PQclear( res );
+		return -EIO;
+	}
+
+	/* the destination file should inherit the data from the source file,
+	   avoid copying stupidly here */
+	res = PQexecParams( conn, "UPDATE data SET dir_id=$1::bigint WHERE dir_id=$2::bigint",
+		2, NULL, values, lengths, binary, 1 );
+
+	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
+		syslog( LOG_ERR, "Error in psql_rename_to_existing_file to move data from '%s' to '%s': %s",
+			from_path, to_path, PQerrorMessage( conn ) );
+		PQclear( res );
+		return -EIO;
+	}
+
+	PQclear( res );
+
+	/* We inherit automatically all metadata from the source
+	   file for the destination file. But we would like to
+	   have the new filename of the destination file. */
+	values[0] = (char *)&param2;
+	values[1] = to_path;
+	lengths[1] = strlen( to_path );
+	binary[1] = 0;
+
+	res = PQexecParams( conn, "UPDATE dir SET name=$2::varchar WHERE id=$1::bigint",
+		2, NULL, values, lengths, binary, 1 );
+
+	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
+		syslog( LOG_ERR, "Error in psql_rename_to_existing_file to set new name for '%s' to '%s': %s",
+			from_path, to_path, PQerrorMessage( conn ) );
+		PQclear( res );
+		return -EIO;
+	}
+
+	PQclear( res );
+
+	/* finally we delete the inode entry for the source file */
+
+	values[0] = (char *)&param2;
+	res = PQexecParams( conn, "DELETE FROM dir where id=$1::bigint",
+		1, NULL, values, lengths, binary, 1 );
+
+	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
+		syslog( LOG_ERR, "Error in psql_renamc_existing_file when deleting dir entry for path '%s': %s",
+			from_path, PQerrorMessage( conn ) );
+		PQclear( res );
+		return -EIO;
+	}
+
+	PQclear( res );
+
+	return 0;
+}
+
 int psql_rename( PGconn *conn, const int64_t from_id, const int64_t from_parent_id, const int64_t to_parent_id, const char *rename_to, const char *from, const char *to )
 {
 	PgMeta from_parent_meta;

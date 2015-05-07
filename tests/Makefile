@@ -66,6 +66,12 @@ test: testfsync testpgsql testtypes testbigfile testopen
 	-df -i mnt
 	# test open/creat and flags
 	-./testopen
+	# move test
+	-echo "afile" > mnt/afile
+	-echo "bfile" > mnt/bfile
+	-mv mnt/afile mnt/bfile
+	-cat mnt/bfile
+	-rm mnt/bfile
 	# END: unmount FUSE file system
 	fusermount -u mnt
 
