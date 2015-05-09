@@ -194,6 +194,9 @@ static int pgfuse_fgetattr( const char *path, struct stat *stbuf, struct fuse_fi
 	stbuf->st_nlink = 1;
 	stbuf->st_uid = meta.uid;
 	stbuf->st_gid = meta.gid;
+	stbuf->st_atime = meta.atime.tv_sec;
+	stbuf->st_mtime = meta.mtime.tv_sec;
+	stbuf->st_ctime = meta.ctime.tv_sec;
 
 	PSQL_COMMIT( conn ); RELEASE( conn );
 	
