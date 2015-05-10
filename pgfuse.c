@@ -154,6 +154,24 @@ static void pgfuse_destroy( void *userdata )
 	}
 }
 
+static void convert_meta_to_stbuf( struct stat *stbuf, PgMeta *meta, PgFuseData *data, int64_t id )
+{
+	/* TODO: check bits of inodes of the kernel */
+	stbuf->st_ino = id;
+	stbuf->st_blocks = 0;
+	stbuf->st_mode = meta->mode;
+	stbuf->st_size = meta->size;
+	stbuf->st_blksize = data->block_size;
+	stbuf->st_blocks = ( meta->size + data->block_size - 1 ) / data->block_size;
+	/* TODO: set correctly from table */
+	stbuf->st_nlink = 1;
+	stbuf->st_uid = meta->uid;
+	stbuf->st_gid = meta->gid;
+	stbuf->st_atime = meta->atime.tv_sec;
+	stbuf->st_mtime = meta->mtime.tv_sec;
+	stbuf->st_ctime = meta->ctime.tv_sec;
+}
+
 static int pgfuse_fgetattr( const char *path, struct stat *stbuf, struct fuse_file_info *fi )
 {
 	PgFuseData *data = (PgFuseData *)fuse_get_context( )->private_data;
@@ -182,22 +200,9 @@ static int pgfuse_fgetattr( const char *path, struct stat *stbuf, struct fuse_fi
 			S_ISDIR( meta.mode ) ? "dir" : "file", path, id,
 			THREAD_ID );
 	}
-	
-	/* TODO: check bits of inodes of the kernel */
-	stbuf->st_ino = id;
-	stbuf->st_blocks = 0;
-	stbuf->st_mode = meta.mode;
-	stbuf->st_size = meta.size;
-	stbuf->st_blksize = data->block_size;
-	stbuf->st_blocks = ( meta.size + data->block_size - 1 ) / data->block_size;
-	/* TODO: set correctly from table */
-	stbuf->st_nlink = 1;
-	stbuf->st_uid = meta.uid;
-	stbuf->st_gid = meta.gid;
-	stbuf->st_atime = meta.atime.tv_sec;
-	stbuf->st_mtime = meta.mtime.tv_sec;
-	stbuf->st_ctime = meta.ctime.tv_sec;
 
+	convert_meta_to_stbuf( stbuf, &meta, data, id );
+	
 	PSQL_COMMIT( conn ); RELEASE( conn );
 	
 	return 0;
@@ -231,21 +236,8 @@ static int pgfuse_getattr( const char *path, struct stat *stbuf )
 			S_ISDIR( meta.mode ) ? "dir" : "file", path, id,
 			THREAD_ID );
 	}
-	
-	/* TODO: check bits of inodes of the kernel */
-	stbuf->st_ino = id;
-	stbuf->st_blocks = 0;
-	stbuf->st_mode = meta.mode;
-	stbuf->st_size = meta.size;
-	stbuf->st_blksize = data->block_size;
-	stbuf->st_blocks = ( meta.size + data->block_size - 1 ) / data->block_size;
-	/* TODO: set correctly from table */
-	stbuf->st_nlink = 1;
-	stbuf->st_uid = meta.uid;
-	stbuf->st_gid = meta.gid;
-	stbuf->st_atime = meta.atime.tv_sec;
-	stbuf->st_mtime = meta.mtime.tv_sec;
-	stbuf->st_ctime = meta.ctime.tv_sec;
+
+	convert_meta_to_stbuf( stbuf, &meta, data, id );
 
 	PSQL_COMMIT( conn ); RELEASE( conn );
 	
@@ -794,7 +786,7 @@ static int pgfuse_write( const char *path, const char *buf, size_t size,
 	if( offset + size > meta.size ) {
 		meta.size = offset + size;
 	}
-	
+
 	res = psql_write_buf( conn, data->block_size, fi->fh, path, buf, offset, size, data->verbose );
 	if( res < 0 ) {
 		PSQL_ROLLBACK( conn ); RELEASE( conn );
