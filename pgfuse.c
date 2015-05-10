@@ -1586,7 +1586,7 @@ enum {
 
 static struct fuse_opt pgfuse_opts[] = {
 	PGFUSE_OPT( 	"ro",		read_only, 1 ),
-	PGFUSE_OPT(	"noatime",	noatime, 0 ),
+	PGFUSE_OPT(	"noatime",	noatime, 1 ),
 	PGFUSE_OPT(     "blocksize=%d",	block_size, DEFAULT_BLOCK_SIZE ),
 	FUSE_OPT_KEY( 	"-h",		KEY_HELP ),
 	FUSE_OPT_KEY( 	"--help",	KEY_HELP ),
