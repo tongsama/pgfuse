@@ -461,6 +461,10 @@ static int pgfuse_open( const char *path, struct fuse_file_info *fi )
 		}
 	}
 	
+	if( !data->noatime ) {
+		meta.atime = now( );
+	}
+	
 	res = psql_write_meta( conn, id, path, meta );
 	if( res < 0 ) {
 		PSQL_ROLLBACK( conn ); RELEASE( conn );
@@ -960,6 +964,7 @@ static int pgfuse_ftruncate( const char *path, off_t offset, struct fuse_file_in
 	}
 	
 	meta.size = offset;
+	meta.mtime = now( );
 	
 	res = psql_write_meta( conn, fi->fh, path, meta );
 	if( res < 0 ) {
@@ -1163,6 +1168,7 @@ static int pgfuse_chmod( const char *path, mode_t mode )
 	}
 		
 	meta.mode = mode;
+	meta.ctime = now( );
 	
 	res = psql_write_meta( conn, id, path, meta );
 	if( res < 0 ) {
@@ -1205,6 +1211,7 @@ static int pgfuse_chown( const char *path, uid_t uid, gid_t gid )
 	
 	meta.uid = uid;
 	meta.gid = gid;
+	meta.ctime = now( );
 	
 	res = psql_write_meta( conn, id, path, meta );
 	if( res < 0 ) {
