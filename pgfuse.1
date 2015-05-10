@@ -61,6 +61,10 @@ Options are the normal FUSE options plus the special PgFuse options:
 \fB-o\fR ro (default="")
 The default is to mount the filesystem read-writable. This can be
 overruled to allow only read operations.
+.TP
+\fB-o\fR noatime (default=false)
+The default is to keep track of access times on reads. This can be
+switched off with noatime.
 .SS "FUSE/Mount options"
 For a list of possible mount and FUSE options consult the manpage
 of \fBmount\fR and the README file of the \fBfuse\fR source package.
