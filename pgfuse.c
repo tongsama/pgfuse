@@ -54,6 +54,7 @@ typedef struct PgFuseData {
 	PGconn *conn;		/* the database handle to operate on (single-thread only) */
 	PgConnPool pool;	/* the database pool to operate on (multi-thread only) */
 	int read_only;		/* whether the mount point is read-only */
+	int noatime;		/* be more efficient by not recording all access times */
 	int multi_threaded;	/* whether we run multi-threaded */
 	size_t block_size;	/* block size to use for storage of data in bytea fields */
 } PgFuseData;
@@ -113,9 +114,10 @@ static void *pgfuse_init( struct fuse_conn_info *conn )
 {
 	PgFuseData *data = (PgFuseData *)fuse_get_context( )->private_data;
 	
-	syslog( LOG_INFO, "Mounting file system on '%s' ('%s', %s), thread #%u",
+	syslog( LOG_INFO, "Mounting file system on '%s' ('%s', %s, %s), thread #%u",
 		data->mountpoint, data->conninfo,
 		data->read_only ? "read-only" : "read-write",
+		data->noatime ? "noatime" : "atime",
 		THREAD_ID );
 	
 	/* in single-threaded case we just need one shared PostgreSQL connection */
@@ -787,6 +789,8 @@ static int pgfuse_write( const char *path, const char *buf, size_t size,
 		meta.size = offset + size;
 	}
 
+	meta.mtime = now( );
+	
 	res = psql_write_buf( conn, data->block_size, fi->fh, path, buf, offset, size, data->verbose );
 	if( res < 0 ) {
 		PSQL_ROLLBACK( conn ); RELEASE( conn );
@@ -816,6 +820,8 @@ static int pgfuse_read( const char *path, char *buf, size_t size,
 	PgFuseData *data = (PgFuseData *)fuse_get_context( )->private_data;
 	int res;
 	PGconn *conn;
+	int64_t tmp;
+	PgMeta meta;
 
 	if( data->verbose ) {
 		syslog( LOG_INFO, "Read to '%s' from offset %jd, size %zu on '%s', thread #%u",
@@ -837,6 +843,23 @@ static int pgfuse_read( const char *path, char *buf, size_t size,
 		return res;
 	}
 
+	if( !data->noatime ) {
+		tmp = psql_read_meta( conn, fi->fh, path, &meta );
+		if( tmp < 0 ) {
+			PSQL_ROLLBACK( conn ); RELEASE( conn );
+			return tmp;
+		}
+		
+		meta.atime = now( );
+
+		tmp = psql_write_meta( conn, fi->fh, path, meta );
+		if( tmp < 0 ) {
+			PSQL_ROLLBACK( conn ); RELEASE( conn );
+			return tmp;
+		}
+	}
+	
+	   
 	PSQL_COMMIT( conn ); RELEASE( conn );
 		
 	return res;
@@ -1477,8 +1500,11 @@ static int pgfuse_utimens( const char *path, const struct timespec tv[2] )
 		PSQL_ROLLBACK( conn ); RELEASE( conn );
 		return id;
 	}
+
+	if( !data->noatime ) {
+		meta.atime = tv[0];
+	}
 		
-	meta.atime = tv[0];
 	meta.mtime = tv[1];
 	
 	res = psql_write_meta( conn, id, path, meta );
@@ -1545,6 +1571,7 @@ typedef struct PgFuseOptions {
 	char *conninfo;		/* connection info as used in PQconnectdb */
 	char *mountpoint;	/* where we mount the virtual filesystem */
 	int read_only;		/* whether to mount read-only */
+	int noatime;		/* be more efficient by not recording all access times */
 	int multi_threaded;	/* whether we run multi-threaded */
 	size_t block_size;	/* block size to use to store data in BYTEA fields */
 } PgFuseOptions;
@@ -1559,6 +1586,7 @@ enum {
 
 static struct fuse_opt pgfuse_opts[] = {
 	PGFUSE_OPT( 	"ro",		read_only, 1 ),
+	PGFUSE_OPT(	"noatime",	noatime, 0 ),
 	PGFUSE_OPT(     "blocksize=%d",	block_size, DEFAULT_BLOCK_SIZE ),
 	FUSE_OPT_KEY( 	"-h",		KEY_HELP ),
 	FUSE_OPT_KEY( 	"--help",	KEY_HELP ),
@@ -1635,6 +1663,7 @@ static void print_usage( char* progname )
 		"\n"
 		"PgFuse options:\n"
 		"    ro                     mount filesystem read-only, do not change data in database\n"
+		"    noatime                do not try to keep access time up to date on every read (only on close)\n"
 		"    blocksize=<bytes>      block size to use for storage of data\n"
 		"\n",
 		progname
@@ -1734,6 +1763,7 @@ int main( int argc, char *argv[] )
 	userdata.mountpoint = pgfuse.mountpoint;
 	userdata.verbose = pgfuse.verbose;
 	userdata.read_only = pgfuse.read_only;
+	userdata.noatime = pgfuse.noatime;
 	userdata.multi_threaded = pgfuse.multi_threaded;
 	userdata.block_size = pgfuse.block_size;
 	
