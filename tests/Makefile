@@ -72,6 +72,17 @@ test: testfsync testpgsql testtypes testbigfile testopen
 	-mv mnt/afile mnt/bfile
 	-cat mnt/bfile
 	-rm mnt/bfile
+	# hard link test
+	-mkdir mnt/dir1
+	-echo "afile" > mnt/dir1/afile
+	-mkdir mnt/dir2
+	-ln mnt/dir1/afile mnt/dir2/bfile
+	-cat mnt/dir2/bfile
+	-ls -al mnt/dir1/afile mnt/dir2/bfile
+	-rm mnt/dir1/afile
+	-rmdir mnt/dir1
+	-cat mnt/dir2/bfile
+	-ls -al mnt/dir2/bfile
 	# END: unmount FUSE file system
 	fusermount -u mnt
 

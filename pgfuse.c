@@ -1441,6 +1441,128 @@ static int pgfuse_rename( const char *from, const char *to )
 	return res;
 }
 
+static int pgfuse_link( const char *from, const char *to )
+{
+	PgFuseData *data = (PgFuseData *)fuse_get_context( )->private_data;
+	char *copy_to;
+	char *parent_path;
+	int64_t parent_id;
+	char *hardlink;
+	int res;
+	//~ int64_t id;
+	int64_t from_id;
+	PGconn *conn;
+	PgMeta meta;
+
+	if( data->verbose ) {
+		syslog( LOG_INFO, "Hardlink from '%s' to '%s' on '%s', thread #%u",
+			from, to, data->mountpoint, THREAD_ID );
+	}
+
+	ACQUIRE( conn );
+	PSQL_BEGIN( conn );
+
+	copy_to = strdup( to );
+	if( copy_to == NULL ) {
+		syslog( LOG_ERR, "Out of memory in hardlink '%s'!", to );
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
+		return -ENOMEM;
+	}
+
+	parent_path = dirname( copy_to );
+
+	parent_id = psql_read_meta_from_path( conn, parent_path, &meta );
+	if( parent_id < 0 ) {
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
+		return parent_id;
+	}
+
+	if( data->verbose ) {
+		syslog( LOG_DEBUG, "Parent_id for hardlink '%s' is %"PRIi64", thread #%u",
+			to, parent_id, THREAD_ID );
+	}
+
+	if( !S_ISDIR( meta.mode ) ) {
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
+		return -ENOTDIR;
+	}
+
+	from_id = psql_read_meta_from_path( conn, from, &meta );
+	if( from_id < 0 ) {
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
+		return from_id;
+	}
+
+	if( data->verbose ) {
+		syslog( LOG_DEBUG, "Referenced id for hardlink '%s' is %"PRIi64", thread #%u",
+			from, from_id, THREAD_ID );
+	}
+
+	free( copy_to );
+	copy_to = strdup( to );
+	if( copy_to == NULL ) {
+		syslog( LOG_ERR, "Out of memory in Hardlink '%s'!", to );
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
+		return -ENOMEM;
+	}
+
+	if( data->read_only ) {
+		free( copy_to );
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
+		return -EROFS;
+	}
+
+	hardlink = basename( copy_to );
+
+	meta.mode |= S_IFLNK | S_IFREG; /* mark it as a hard link with an illegal mode */
+	/* TODO: use FUSE context */
+	meta.uid = fuse_get_context( )->uid;
+	meta.gid = fuse_get_context( )->gid;
+	meta.ctime = now( );
+
+	res = psql_create_file( conn, parent_id, to, hardlink, meta );
+	if( res < 0 ) {
+		free( copy_to );
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
+		return res;
+	}
+	
+	free( copy_to );
+
+	PSQL_COMMIT( conn ); RELEASE( conn );
+	
+	return 0;
+}
+
+#if 0
+static int pgfuse_symlink( const char *from, const char *to )
+{	
+	id = psql_read_meta_from_path( conn, to, &meta );
+	if( id < 0 ) {
+		free( copy_to );
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
+		return id;
+	}
+
+	res = psql_write_buf( conn, data->block_size, id, to, from, 0, strlen( from ), data->verbose );
+	if( res < 0 ) {
+		free( copy_to );
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
+		return res;
+	}
+	
+	if( res != strlen( from ) ) {
+		free( copy_to );
+		PSQL_ROLLBACK( conn ); RELEASE( conn );
+		return -EIO;
+	}
+
+	
+	
+	return 0;
+}
+#endif
+
 static int pgfuse_readlink( const char *path, char *buf, size_t size )
 {
 	PgFuseData *data = (PgFuseData *)fuse_get_context( )->private_data;
@@ -1535,7 +1657,7 @@ static struct fuse_operations pgfuse_oper = {
 	.rmdir		= pgfuse_rmdir,
 	.symlink	= pgfuse_symlink,
 	.rename		= pgfuse_rename,
-	.link		= NULL,
+	.link		= pgfuse_link,
 	.chmod		= pgfuse_chmod,
 	.chown		= pgfuse_chown,
 	.utime		= NULL,		/* deprecated in favour of 'utimes' */
