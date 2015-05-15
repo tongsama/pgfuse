@@ -281,6 +281,8 @@ int psql_create_file( PGconn *conn, const int64_t parent_id, const char *path, c
 	int lengths[7] = { sizeof( param1 ), sizeof( param2 ), sizeof( param3 ), sizeof( param4 ), sizeof( param5 ), sizeof( param6 ), sizeof( param7 ) };
 	int binary[7] = { 1, 1, 1, 1, 1, 1, 1 };
 	PGresult *res;
+	char *iptr;
+	uint64_t inode_id;
 	
 	res = PQexecParams( conn, "INSERT INTO inode( size, mode, uid, gid, ctime, mtime, atime ) VALUES( $1::bigint, $2::integer, $3::integer, $4::integer, $5::timestamp, $6::timestamp, $7::timestamp ) RETURNING id",
 		7, NULL, values, lengths, binary, 0 );
@@ -305,10 +307,8 @@ int psql_create_file( PGconn *conn, const int64_t parent_id, const char *path, c
 		return -EIO;
 	}
 
-	char *iptr;
 	iptr = PQgetvalue( res, 0, 0 );
-
-	uint64_t inode_id = atoi( iptr );
+	inode_id = atoi( iptr );
 	
 	PQclear( res );
 
@@ -509,6 +509,8 @@ int psql_create_dir( PGconn *conn, const int64_t parent_id, const char *path, co
 	int lengths[6] = { sizeof( param1 ), sizeof( param2 ), sizeof( param3 ), sizeof( param4 ), sizeof( param5 ), sizeof( param6 ) };
 	int binary[6] = { 1, 1, 1, 1, 1, 1 };
 	PGresult *res;
+	char *iptr;
+	uint64_t inode_id;
 
 	res = PQexecParams( conn, "INSERT INTO inode( mode, uid, gid, ctime, mtime, atime ) VALUES( $1::integer, $2::integer, $3::integer, $4::timestamp, $5::timestamp, $6::timestamp ) RETURNING id",
 		6, NULL, values, lengths, binary, 0 );
@@ -533,10 +535,8 @@ int psql_create_dir( PGconn *conn, const int64_t parent_id, const char *path, co
 		return -EIO;
 	}
 
-	char *iptr;
 	iptr = PQgetvalue( res, 0, 0 );
-
-	uint64_t inode_id = atoi( iptr );
+	inode_id = atoi( iptr );
 	
 	PQclear( res );
 
@@ -584,12 +584,13 @@ int psql_delete_dir( PGconn *conn, const int64_t id, const char *path )
 	PGresult *res;
 	char *iptr;
 	int count;
+	uint64_t inode_id;
 	
 	res = PQexecParams( conn, "SELECT COUNT(*) FROM dir where parent_id=$1::bigint",
 		1, NULL, values, lengths, binary, 0 );
 		
 	if( PQresultStatus( res ) != PGRES_TUPLES_OK ) {
-		syslog( LOG_ERR, "Error in psql_delete_dir for path '%s': %s", path, PQerrorMessage( conn ) );
+		syslog( LOG_ERR, "Error in psql_delete_dir for counting files still in directory '%s': %s", path, PQerrorMessage( conn ) );
 		PQclear( res );
 		return -EIO;
 	}
@@ -609,12 +610,53 @@ int psql_delete_dir( PGconn *conn, const int64_t id, const char *path )
 	}
 
 	PQclear( res );
-		
+
+	res = PQexecParams( conn, "SELECT inode_id FROM dir WHERE id=$1::bigint",
+		1, NULL, values, lengths, binary, 0 );
+	
+	if( PQresultStatus( res ) != PGRES_TUPLES_OK ) {		
+		syslog( LOG_ERR, "Error in psql_delete_dir for inode entry of directory path '%s': %s",
+			path, PQerrorMessage( conn ) );
+		PQclear( res );
+		return -EIO;
+	}
+	
+	if( atoi( PQcmdTuples( res ) ) != 1 ) {
+		syslog( LOG_ERR, "Expecting one new inode row in psql_delete_dir, not %d!",
+			atoi( PQcmdTuples( res ) ) );
+		PQclear( res );
+		return -EIO;
+	}
+
+	if( PQntuples( res ) != 1 ) {
+		syslog( LOG_ERR, "Expecting a directory to have exactly one inode entry, weird!" );
+		PQclear( res );
+		return -EIO;
+	}
+
+	iptr = PQgetvalue( res, 0, 0 );
+	inode_id = atoi( iptr );
+	
+	PQclear( res );
+
 	res = PQexecParams( conn, "DELETE FROM dir where id=$1::bigint",
 		1, NULL, values, lengths, binary, 1 );
 
 	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
-		syslog( LOG_ERR, "Error in psql_delete_dir for path '%s': %s", path, PQerrorMessage( conn ) );
+		syslog( LOG_ERR, "Error in psql_delete_dir (dir) for path '%s': %s", path, PQerrorMessage( conn ) );
+		PQclear( res );
+		return -EIO;
+	}
+	
+	PQclear( res );
+
+	param1 = htobe64( inode_id );
+	
+	res = PQexecParams( conn, "DELETE FROM inode where id = $1::bigint",
+		1, NULL, values, lengths, binary, 1 );
+
+	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
+		syslog( LOG_ERR, "Error in psql_delete_dir (inode) for path '%s': %s", path, PQerrorMessage( conn ) );
 		PQclear( res );
 		return -EIO;
 	}
