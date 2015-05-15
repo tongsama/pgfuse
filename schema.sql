@@ -1,13 +1,3 @@
-CREATE TABLE dir (
-	id BIGSERIAL,
-	parent_id BIGINT,
-	name TEXT,
-	inode_id BIGSERIAL,
-	PRIMARY KEY( id ),
-	FOREIGN KEY( inode_id ) REFERENCES inode( id ),
-	UNIQUE( name, parent_id )
-);
-
 CREATE TABLE inode (
 	id BIGSERIAL,
 	size BIGINT DEFAULT 0,
@@ -18,6 +8,16 @@ CREATE TABLE inode (
 	mtime TIMESTAMP,
 	atime TIMESTAMP,
 	PRIMARY KEY( id )
+);
+
+CREATE TABLE dir (
+	id BIGSERIAL,
+	parent_id BIGINT,
+	name TEXT,
+	inode_id BIGSERIAL,
+	PRIMARY KEY( id ),
+	FOREIGN KEY( inode_id ) REFERENCES inode( id ),
+	UNIQUE( name, parent_id )
 );
 
 -- TODO: 4096 is STANDARD_BLOCK_SIZE in config.h, must be in sync!
@@ -50,6 +50,6 @@ CREATE OR REPLACE RULE "inode_remove" AS ON
 -- 16895 = S_IFDIR and 0777 permissions, belonging to root/root
 -- TODO: should be done from outside, see note above
 INSERT INTO inode( id, size, mode, uid, gid, ctime, mtime, atime )
-	VALUES( 0, 0, 16895, 0, 0, NOW( ), NOW( ), NOW( ) )
+	VALUES( 0, 0, 16895, 0, 0, NOW( ), NOW( ), NOW( ) );
 INSERT INTO dir( id, parent_id, name, inode_id )
 	VALUES( 0, 0, '/', 0 );

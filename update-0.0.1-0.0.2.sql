@@ -1,6 +1,8 @@
 ALTER TABLE dir RENAME TO inode;
 ALTER INDEX dir_pkey RENAME TO inode_pkey;
 
+ALTER SEQUENCE dir_id_seq RENAME TO inode_id_seq;
+
 ALTER TABLE inode DROP CONSTRAINT dir_name_parent_id_key;
 ALTER TABLE inode DROP CONSTRAINT dir_parent_id_fkey;
 

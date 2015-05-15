@@ -1,3 +1,4 @@
-DROP RULE dir_remove ON dir;
+DROP RULE inode_remove ON inode;
 DROP TABLE data;
 DROP TABLE dir;
+DROP TABLE inode;
