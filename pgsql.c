@@ -673,18 +673,78 @@ int psql_delete_file( PGconn *conn, const int64_t id, const char *path )
 	int lengths[1] = { sizeof( param1 ) };
 	int binary[1] = { 1 };
 	PGresult *res;
+	char *iptr;
+	uint64_t inode_id;
+	int count;
+
+	res = PQexecParams( conn, "SELECT inode_id FROM dir WHERE id=$1::bigint",
+		1, NULL, values, lengths, binary, 0 );
+
+	if( PQresultStatus( res ) != PGRES_TUPLES_OK ) {		
+		syslog( LOG_ERR, "Error in psql_delete_file for fetching inode entry of file path '%s': %s",
+			path, PQerrorMessage( conn ) );
+		PQclear( res );
+		return -EIO;
+	}
+
+	if( PQntuples( res ) != 1 ) {
+		syslog( LOG_ERR, "Expecting a directory to have exactly one inode entry, weird!" );
+		PQclear( res );
+		return -EIO;
+	}
+
+	iptr = PQgetvalue( res, 0, 0 );
+	inode_id = atoi( iptr );
+	
+	PQclear( res );
 	
 	res = PQexecParams( conn, "DELETE FROM dir where id=$1::bigint",
 		1, NULL, values, lengths, binary, 1 );
 
 	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
-		syslog( LOG_ERR, "Error in psql_delete_dir for path '%s': %s",
+		syslog( LOG_ERR, "Error in psql_delete_file (dir) for path '%s': %s",
 			path, PQerrorMessage( conn ) );
 		PQclear( res );
 		return -EIO;
 	}
 	
 	PQclear( res );
+	
+	res = PQexecParams( conn, "SELECT COUNT(*) FROM dir where inode_id=$1::bigint",
+		1, NULL, values, lengths, binary, 0 );
+		
+	if( PQresultStatus( res ) != PGRES_TUPLES_OK ) {
+		syslog( LOG_ERR, "Error in psql_delete_file for counting directoy entries still in using inode '%s': %s", path, PQerrorMessage( conn ) );
+		PQclear( res );
+		return -EIO;
+	}
+
+	if( PQntuples( res ) != 1 ) {
+		syslog( LOG_ERR, "Expecting COUNT(*) to return 1 tuple, weird!" );
+		PQclear( res );
+		return -EIO;
+	}
+
+	iptr = PQgetvalue( res, 0, 0 );
+	count = atoi( iptr );
+	
+	PQclear( res );
+	
+	if( count == 0 ) {
+
+		param1 = htobe64( inode_id );
+
+		res = PQexecParams( conn, "DELETE FROM inode where id = $1::bigint",
+			1, NULL, values, lengths, binary, 1 );
+
+		if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
+			syslog( LOG_ERR, "Error in psql_delete_file (inode) for path '%s': %s", path, PQerrorMessage( conn ) );
+			PQclear( res );
+			return -EIO;
+		}	
+		
+		PQclear( res );
+	}
 	
 	return 0;
 }
