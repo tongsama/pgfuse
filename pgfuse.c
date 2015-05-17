@@ -1109,7 +1109,7 @@ static int pgfuse_statfs( const char *path, struct statvfs *buf )
 
 	if( data->verbose ) {
 		syslog( LOG_DEBUG, "Stats for '%s' are (%jd blocks total, %jd used, %jd free, "
-			"%"PRId64" inodes total, %"PRId64" inodes used, %"PRId64" inodes free, thread #%u",
+			"%jd inodes total, %jd inodes used, %jd inodes free, thread #%u",
 			data->mountpoint, 
 			blocks_total, blocks_used, blocks_free,
 			inodes_total, inodes_used, inodes_free,
