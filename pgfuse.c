@@ -1096,7 +1096,7 @@ static int pgfuse_statfs( const char *path, struct statvfs *buf )
 
 	/* no restriction on the number of files storable, we could
 	   add some limits later */
-	files_free = INT64_MAX;
+	files_total = INT64_MAX;
 	
 	files_used = psql_get_fs_files_used( conn );
 	if( files_used < 0 ) {
@@ -1104,12 +1104,12 @@ static int pgfuse_statfs( const char *path, struct statvfs *buf )
 		return files_used;
 	}
 	
-	files_total = files_free + files_used;
+	files_free = files_total - files_used;
 	files_avail = files_free;
 
 	if( data->verbose ) {
 		syslog( LOG_DEBUG, "Stats for '%s' are (%jd blocks total, %jd used, %jd free, "
-			"%jd files total, %jd files used, %jd files free, thread #%u",
+			"%"PRId64" inodes total, %"PRId64" inodes used, %"PRId64" inodes free, thread #%u",
 			data->mountpoint, 
 			blocks_total, blocks_used, blocks_free,
 			files_total, files_used, files_free,
