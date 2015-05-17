@@ -1096,7 +1096,7 @@ static int pgfuse_statfs( const char *path, struct statvfs *buf )
 
 	/* no restriction on the number of inodes storable, we could
 	   add some limits later */
-	inodes_free = INT64_MAX;
+	inodes_total = INT64_MAX;
 	
 	inodes_used = psql_get_fs_inodes_used( conn );
 	if( inodes_used < 0 ) {
@@ -1104,12 +1104,12 @@ static int pgfuse_statfs( const char *path, struct statvfs *buf )
 		return inodes_used;
 	}
 	
-	inodes_total = inodes_free + inodes_used;
+	inodes_free = inodes_total - inodes_used;
 	inodes_avail = inodes_free;
 
 	if( data->verbose ) {
 		syslog( LOG_DEBUG, "Stats for '%s' are (%jd blocks total, %jd used, %jd free, "
-			"%jd files total, %jd files used, %jd files free, thread #%u",
+			"%"PRId64" inodes total, %"PRId64" inodes used, %"PRId64" inodes free, thread #%u",
 			data->mountpoint, 
 			blocks_total, blocks_used, blocks_free,
 			inodes_total, inodes_used, inodes_free,
