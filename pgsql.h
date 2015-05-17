@@ -104,6 +104,6 @@ int64_t psql_get_fs_blocks_used( PGconn *conn );
 
 int psql_get_tablespace_locations( PGconn *conn, char **location, size_t *nof_oids, int verbose );
 
-int64_t psql_get_fs_files_used( PGconn *conn );
+int64_t psql_get_fs_inodes_used( PGconn *conn );
 
 #endif

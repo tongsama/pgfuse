@@ -92,6 +92,54 @@ static PgDataInfo compute_block_info( size_t block_size, off_t offset, size_t le
 	return info;
 }
 
+int psql_begin( PGconn *conn )
+{
+	PGresult *res;
+	
+	res = PQexec( conn, "BEGIN" );
+	
+	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
+		syslog( LOG_ERR, "Begin of transaction failed!!" );
+		return -EIO;
+	}
+	
+	PQclear( res );
+	
+	return 0;
+}
+
+int psql_commit( PGconn *conn )
+{
+	PGresult *res;
+	
+	res = PQexec( conn, "COMMIT" );
+	
+	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
+		syslog( LOG_ERR, "Commit of transaction failed!!" );
+		return -EIO;
+	}
+	
+	PQclear( res );
+	
+	return 0;
+}
+
+int psql_rollback( PGconn *conn )
+{
+	PGresult *res;
+	
+	res = PQexec( conn, "ROLLBACK" );
+	
+	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
+		syslog( LOG_ERR, "Rollback of transaction failed!!" );
+		return -EIO;
+	}
+	
+	PQclear( res );
+	
+	return 0;
+}
+
 int64_t psql_path_to_id( PGconn *conn, const char *path )
 {
 	PGresult *res;
@@ -157,8 +205,6 @@ int64_t psql_path_to_id( PGconn *conn, const char *path )
 	
 	return be64toh( id );
 }
-
-/* --- postgresql implementation --- */
 
 int64_t psql_read_meta( PGconn *conn, const int64_t id, const char *path, PgMeta *meta )
 {
@@ -757,6 +803,8 @@ static int psql_write_block( PGconn *conn, const size_t block_size, const int64_
 	int lengths[3] = { sizeof( param1 ), sizeof( param2 ), len };
 	int binary[3] = { 1, 1, 1 };
 	PGresult *res;
+	char *iptr;
+	uint64_t inode_id;
 	char sql[256];
 	
 	/* could actually be an assertion, as this can never happen */
@@ -766,29 +814,51 @@ static int psql_write_block( PGconn *conn, const size_t block_size, const int64_
 		return -EIO;
 	}
 
+	res = PQexecParams( conn, "SELECT inode_id FROM dir WHERE id=$1::bigint",
+		1, NULL, values, lengths, binary, 0 );
+
+	if( PQresultStatus( res ) != PGRES_TUPLES_OK ) {		
+		syslog( LOG_ERR, "Error in psql_write_block for fetching inode entry of file path '%s': %s",
+			path, PQerrorMessage( conn ) );
+		PQclear( res );
+		return -EIO;
+	}
+
+	if( PQntuples( res ) != 1 ) {
+		syslog( LOG_ERR, "Expecting a directory to have exactly one inode entry, weird!" );
+		PQclear( res );
+		return -EIO;
+	}
+
+	iptr = PQgetvalue( res, 0, 0 );
+	inode_id = atoi( iptr );
+	param1 = htobe64( inode_id );
+	
+	PQclear( res );
+
 update_again:
 
 	/* write a complete block, old data in the database doesn't bother us */
 	if( offset == 0 && len == block_size ) {
 		
-		strcpy( sql, "UPDATE data set data = $3::bytea WHERE dir_id=$1::bigint AND block_no=$2::bigint" );
+		strcpy( sql, "UPDATE data set data = $3::bytea WHERE inode_id=$1::bigint AND block_no=$2::bigint" );
 		
 	/* keep data on the right */
 	} else if( offset == 0 && len < block_size ) {
 
-		sprintf( sql, "UPDATE data set data = $3::bytea || substring( data from %zu for %zu ) WHERE dir_id=$1::bigint AND block_no=$2::bigint",
+		sprintf( sql, "UPDATE data set data = $3::bytea || substring( data from %zu for %zu ) WHERE inode_id=$1::bigint AND block_no=$2::bigint",
 			len + 1, block_size - len );
 
 	/* keep data on the left */
 	} else if( offset > 0 && offset + len == block_size ) {
 		
-		sprintf( sql, "UPDATE data set data = substring( data from %d for %jd ) || $3::bytea WHERE dir_id=$1::bigint AND block_no=$2::bigint",
+		sprintf( sql, "UPDATE data set data = substring( data from %d for %jd ) || $3::bytea WHERE inode_id=$1::bigint AND block_no=$2::bigint",
 			1, offset );
 
 	/* small in the middle write, keep data on both sides */
 	} else if( offset > 0 && offset + len < block_size ) {
 
-		sprintf( sql, "UPDATE data set data = substring( data from %d for %jd ) || $3::bytea || substring( data from %jd for %jd ) WHERE dir_id=$1::bigint AND block_no=$2::bigint",
+		sprintf( sql, "UPDATE data set data = substring( data from %d for %jd ) || $3::bytea || substring( data from %jd for %jd ) WHERE inode_id=$1::bigint AND block_no=$2::bigint",
 			1, offset,
 			offset + len + 1, block_size - ( offset + len ) );
 						
@@ -831,7 +901,7 @@ update_again:
 	PQclear( res );
 	
 	/* the block didn't exist, so create one */
-	sprintf( sql, "INSERT INTO data( dir_id, block_no, data ) VALUES"
+	sprintf( sql, "INSERT INTO data( inode_id, block_no, data ) VALUES"
 		" ( $1::bigint, $2::bigint, repeat(E'\\\\000',%zu)::bytea )", block_size );
 	res = PQexecParams( conn, sql, 2, NULL, values, lengths, binary, 1 );
 
@@ -915,13 +985,15 @@ int psql_truncate( PGconn *conn, const size_t block_size, const int64_t id, cons
 	PgDataInfo info;
 	int64_t res;
 	PgMeta meta;
-	int64_t param1;
+	int64_t param1 = htobe64( id );
 	int64_t param2;
 	const char *values[2] = { (const char *)&param1, (const char *)&param2 };
 	int lengths[2] = { sizeof( param1 ), sizeof( param2 ) };
 	int binary[2] = { 1, 1 };
 	PGresult *dbres;
 	char sql[256];
+	char *iptr;
+	uint64_t inode_id;
 	
 	res = psql_read_meta( conn, id, path, &meta );
 	if( res < 0 ) {
@@ -929,14 +1001,35 @@ int psql_truncate( PGconn *conn, const size_t block_size, const int64_t id, cons
 	}
 	
 	info = compute_block_info( block_size, 0, offset );
+
+	dbres = PQexecParams( conn, "SELECT inode_id FROM dir WHERE id=$1::bigint",
+		1, NULL, values, lengths, binary, 0 );
+
+	if( PQresultStatus( dbres ) != PGRES_TUPLES_OK ) {		
+		syslog( LOG_ERR, "Error in psql_truncate for fetching inode entry of file path '%s': %s",
+			path, PQerrorMessage( conn ) );
+		PQclear( dbres );
+		return -EIO;
+	}
+
+	if( PQntuples( dbres ) != 1 ) {
+		syslog( LOG_ERR, "Expecting a directory to have exactly one inode entry, weird!" );
+		PQclear( dbres );
+		return -EIO;
+	}
+
+	iptr = PQgetvalue( dbres, 0, 0 );
+	inode_id = atoi( iptr );
+	param1 = htobe64( inode_id );
 	
-	param1 = htobe64( id );
+	PQclear( dbres );
+	
 	param2 = htobe64( info.to_block );
 	
 	syslog( LOG_ERR, "TRUNC: %"PRIu64", block %jd", id, info.to_block );
 	
 	/* delete superflous blocks */
-	dbres = PQexecParams( conn, "DELETE FROM data WHERE dir_id=$1::bigint AND block_no>$2::bigint",
+	dbres = PQexecParams( conn, "DELETE FROM data WHERE inode_id=$1::bigint AND block_no>$2::bigint",
 		2, NULL, values, lengths, binary, 1 );
 	
 	if( PQresultStatus( dbres ) != PGRES_COMMAND_OK ) {
@@ -950,7 +1043,7 @@ int psql_truncate( PGconn *conn, const size_t block_size, const int64_t id, cons
 	
 	/* pad right part of now last block */
 	sprintf( sql, "UPDATE data SET data = substring( data from 1 for %zd ) || "
-			"repeat(E'\\\\000',%zu)::bytea WHERE dir_id=$1::bigint AND block_no=$2::bigint",
+			"repeat(E'\\\\000',%zu)::bytea WHERE inode_id=$1::bigint AND block_no=$2::bigint",
 			info.to_len,
 			block_size - info.to_len );
 
@@ -985,54 +1078,63 @@ int psql_truncate( PGconn *conn, const size_t block_size, const int64_t id, cons
 	return 0;
 }
 
-int psql_begin( PGconn *conn )
+int psql_rename( PGconn *conn, const int64_t from_id, const int64_t from_parent_id, const int64_t to_parent_id, const char *rename_to, const char *from, const char *to )
 {
+	PgMeta from_parent_meta;
+	PgMeta to_parent_meta;
+	int64_t id;
+	int64_t param1 = htobe64( to_parent_id );
+	int64_t param3 = htobe64( from_id );
+	const char *values[3] = { (const char *)&param1, rename_to, (const char *)&param3 };
+	int lengths[3] = { sizeof( param1 ), strlen( rename_to ), sizeof( param3 ) };
+	int binary[3] = { 1, 0, 1 };
 	PGresult *res;
 	
-	res = PQexec( conn, "BEGIN" );
+	id = psql_read_meta( conn, from_parent_id, from, &from_parent_meta );
+	if( id < 0 ) {
+		return id;
+	}
 	
+	if( !S_ISDIR( from_parent_meta.mode ) ) {
+		syslog( LOG_ERR, "Expecting parent with id '%"PRIi64"' of '%s' (id '%"PRIi64"') to be a directory in psql_rename, but mode is '%o'!",
+			from_parent_id, from, from_id, from_parent_meta.mode );
+		return -EIO;
+	}
+	
+	id = psql_read_meta( conn, to_parent_id, to, &to_parent_meta );
+	if( id < 0 ) {
+		return id;
+	}
+
+	if( !S_ISDIR( to_parent_meta.mode ) ) {
+		syslog( LOG_ERR, "Expecting parent with id '%"PRIi64"' of '%s' to be a directory in psql_rename, but mode is '%o'!",
+			to_parent_id, to, to_parent_meta.mode );
+		return -EIO;
+	}
+	
+	res = PQexecParams( conn, "UPDATE dir SET parent_id=$1::bigint, name=$2::varchar WHERE id=$3::bigint",
+		3, NULL, values, lengths, binary, 1 );
+
 	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
-		syslog( LOG_ERR, "Begin of transaction failed!!" );
+		syslog( LOG_ERR, "Error in psql_rename for '%s' to '%s': %s", 
+			from, to, PQerrorMessage( conn ) );
+		PQclear( res );
+		return -EIO;
+	}
+
+	if( atoi( PQcmdTuples( res ) ) != 1 ) {
+		syslog( LOG_ERR, "Expecting one new row in psql_rename from '%s' to '%s', not %d!",
+			from, to, atoi( PQcmdTuples( res ) ) );
+		PQclear( res );
 		return -EIO;
 	}
 	
 	PQclear( res );
-	
+			
 	return 0;
 }
 
-int psql_commit( PGconn *conn )
-{
-	PGresult *res;
-	
-	res = PQexec( conn, "COMMIT" );
-	
-	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
-		syslog( LOG_ERR, "Commit of transaction failed!!" );
-		return -EIO;
-	}
-	
-	PQclear( res );
-	
-	return 0;
-}
-
-int psql_rollback( PGconn *conn )
-{
-	PGresult *res;
-	
-	res = PQexec( conn, "ROLLBACK" );
-	
-	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
-		syslog( LOG_ERR, "Rollback of transaction failed!!" );
-		return -EIO;
-	}
-	
-	PQclear( res );
-	
-	return 0;
-}
-
+/* TODO: hard to rewrite to inodes this time */
 int psql_rename_to_existing_file( PGconn *conn, const int64_t from_id, const int64_t to_id, const char *from_path, const char *to_path )
 {
 	int64_t param1 = htobe64( to_id );
@@ -1105,62 +1207,6 @@ int psql_rename_to_existing_file( PGconn *conn, const int64_t from_id, const int
 	return 0;
 }
 
-int psql_rename( PGconn *conn, const int64_t from_id, const int64_t from_parent_id, const int64_t to_parent_id, const char *rename_to, const char *from, const char *to )
-{
-	PgMeta from_parent_meta;
-	PgMeta to_parent_meta;
-	int64_t id;
-	int64_t param1 = htobe64( to_parent_id );
-	int64_t param3 = htobe64( from_id );
-	const char *values[3] = { (const char *)&param1, rename_to, (const char *)&param3 };
-	int lengths[3] = { sizeof( param1 ), strlen( rename_to ), sizeof( param3 ) };
-	int binary[3] = { 1, 0, 1 };
-	PGresult *res;
-	
-	id = psql_read_meta( conn, from_parent_id, from, &from_parent_meta );
-	if( id < 0 ) {
-		return id;
-	}
-	
-	if( !S_ISDIR( from_parent_meta.mode ) ) {
-		syslog( LOG_ERR, "Expecting parent with id '%"PRIi64"' of '%s' (id '%"PRIi64"') to be a directory in psql_rename, but mode is '%o'!",
-			from_parent_id, from, from_id, from_parent_meta.mode );
-		return -EIO;
-	}
-	
-	id = psql_read_meta( conn, to_parent_id, to, &to_parent_meta );
-	if( id < 0 ) {
-		return id;
-	}
-
-	if( !S_ISDIR( to_parent_meta.mode ) ) {
-		syslog( LOG_ERR, "Expecting parent with id '%"PRIi64"' of '%s' to be a directory in psql_rename, but mode is '%o'!",
-			to_parent_id, to, to_parent_meta.mode );
-		return -EIO;
-	}
-	
-	res = PQexecParams( conn, "UPDATE dir SET parent_id=$1::bigint, name=$2::varchar WHERE id=$3::bigint",
-		3, NULL, values, lengths, binary, 1 );
-
-	if( PQresultStatus( res ) != PGRES_COMMAND_OK ) {
-		syslog( LOG_ERR, "Error in psql_rename for '%s' to '%s': %s", 
-			from, to, PQerrorMessage( conn ) );
-		PQclear( res );
-		return -EIO;
-	}
-
-	if( atoi( PQcmdTuples( res ) ) != 1 ) {
-		syslog( LOG_ERR, "Expecting one new row in psql_rename from '%s' to '%s', not %d!",
-			from, to, atoi( PQcmdTuples( res ) ) );
-		PQclear( res );
-		return -EIO;
-	}
-	
-	PQclear( res );
-			
-	return 0;
-}
-
 size_t psql_get_block_size( PGconn *conn, const size_t block_size )
 {
 	PGresult *res;
@@ -1195,14 +1241,14 @@ int64_t psql_get_fs_blocks_used( PGconn *conn )
 	int64_t used;
 	
 	/* we calculate the number of blocks occuppied by all data entries
-	 * plus all "indoes" (in our case entries in dir),
-	 * more like a filesystem would do it. Returning blocks as this is
-	 * harder to overflow a size_t (in case it's 32-bit, modern
+	 * plus all indoes and directory entries, more like a filesystem
+	 * would do it. Returning blocks like this is less likely to
+	 * overflow a size_t (in case it's 32-bit, modern
 	 * systems shouldn't care). It's not so fast though, otherwise we
 	 * must consider a 'stats' table which is periodically updated
 	 * (not constantly in order to avoid a hot-spot in the database!)
 	 */
-	res = PQexec( conn, "SELECT (SELECT COUNT(*) FROM data) + (SELECT COUNT(*) FROM dir)" );
+	res = PQexec( conn, "SELECT (SELECT COUNT(*) FROM data) + (SELECT COUNT(*) FROM dir) + (SELECT COUNT(*) FROM inode)" );
         if( PQresultStatus( res ) != PGRES_TUPLES_OK ) {
                 syslog( LOG_ERR, "Error in psql_get_fs_blocks_used: %s", PQerrorMessage( conn ) );
                 PQclear( res );
@@ -1395,15 +1441,15 @@ int psql_get_tablespace_locations( PGconn *conn, char **location, size_t *nof_oi
 	return 0;
 }
 
-int64_t psql_get_fs_files_used( PGconn *conn )
+int64_t psql_get_fs_inodes_used( PGconn *conn )
 {
 	PGresult *res;
 	char *data;
 	int64_t used;
 	
-	res = PQexec( conn, "SELECT COUNT(*) FROM dir" );
+	res = PQexec( conn, "SELECT COUNT(*) FROM inode" );
         if( PQresultStatus( res ) != PGRES_TUPLES_OK ) {
-                syslog( LOG_ERR, "Error in psql_get_fs_files_used: %s", PQerrorMessage( conn ) );
+                syslog( LOG_ERR, "Error in psql_get_fs_inodes_used: %s", PQerrorMessage( conn ) );
                 PQclear( res );
                 return -EIO;
         }

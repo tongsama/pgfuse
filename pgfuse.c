@@ -982,7 +982,7 @@ static int pgfuse_statfs( const char *path, struct statvfs *buf )
 	PgFuseData *data = (PgFuseData *)fuse_get_context( )->private_data;
 	PGconn *conn;
 	int64_t blocks_total, blocks_used, blocks_free, blocks_avail;
-	int64_t files_total, files_used, files_free, files_avail;
+	int64_t inodes_total, inodes_used, inodes_free, inodes_avail;
 	int res;
 	int i;
 	size_t nof_locations = MAX_TABLESPACE_OIDS;
@@ -1094,25 +1094,25 @@ static int pgfuse_statfs( const char *path, struct statvfs *buf )
 	
 	/* inodes */
 
-	/* no restriction on the number of files storable, we could
+	/* no restriction on the number of inodes storable, we could
 	   add some limits later */
-	files_free = INT64_MAX;
+	inodes_free = INT64_MAX;
 	
-	files_used = psql_get_fs_files_used( conn );
-	if( files_used < 0 ) {
+	inodes_used = psql_get_fs_inodes_used( conn );
+	if( inodes_used < 0 ) {
                 PSQL_ROLLBACK( conn ); RELEASE( conn );
-		return files_used;
+		return inodes_used;
 	}
 	
-	files_total = files_free + files_used;
-	files_avail = files_free;
+	inodes_total = inodes_free + inodes_used;
+	inodes_avail = inodes_free;
 
 	if( data->verbose ) {
 		syslog( LOG_DEBUG, "Stats for '%s' are (%jd blocks total, %jd used, %jd free, "
 			"%jd files total, %jd files used, %jd files free, thread #%u",
 			data->mountpoint, 
 			blocks_total, blocks_used, blocks_free,
-			files_total, files_used, files_free,
+			inodes_total, inodes_used, inodes_free,
 			THREAD_ID );
 	}
 	
@@ -1125,9 +1125,9 @@ static int pgfuse_statfs( const char *path, struct statvfs *buf )
 	buf->f_blocks = blocks_total;
 	buf->f_bfree = blocks_free;
 	buf->f_bavail = blocks_avail;
-	buf->f_files = files_total;
-	buf->f_ffree = files_free;
-	buf->f_favail = files_avail;
+	buf->f_files = inodes_total;
+	buf->f_ffree = inodes_free;
+	buf->f_favail = inodes_avail;
 	buf->f_fsid =  0x4FE3A364;
 	if( data->read_only ) {
 		buf->f_flag |= ST_RDONLY;
