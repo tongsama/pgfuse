@@ -1382,7 +1382,7 @@ int psql_get_tablespace_locations( PGconn *conn, char **location, size_t *nof_oi
 	}
 	
 	/* Get a list of oids containing the tablespaces of PgFuse tables and indexes */
-	res = PQexec( conn, "select distinct reltablespace::int4 FROM pg_class WHERE relname in ( 'dir', 'data', 'data_dir_id_idx', 'data_block_no_idx', 'dir_parent_id_idx' )" );
+	res = PQexec( conn, "select distinct reltablespace::int4 FROM pg_class WHERE relname in ( 'dir', 'dir_pkey', 'dir_name_parent_id_key', 'inode', 'inode_pkey', 'data', 'data_pkey', 'data_block_no_idx', 'data_inode_id_idx' )" );
 	
 	if( PQresultStatus( res ) != PGRES_TUPLES_OK ) {
 		syslog( LOG_ERR, "Error in psql_get_fs_blocks_free: %s", PQerrorMessage( conn ) );
