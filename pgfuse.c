@@ -1514,7 +1514,6 @@ static int pgfuse_link( const char *from, const char *to )
 
 	hardlink = basename( copy_to );
 
-	meta.mode |= S_IFLNK | S_IFREG; /* mark it as a hard link with an illegal mode */
 	/* TODO: use FUSE context */
 	meta.uid = fuse_get_context( )->uid;
 	meta.gid = fuse_get_context( )->gid;
@@ -1533,35 +1532,6 @@ static int pgfuse_link( const char *from, const char *to )
 	
 	return 0;
 }
-
-#if 0
-static int pgfuse_symlink( const char *from, const char *to )
-{	
-	id = psql_read_meta_from_path( conn, to, &meta );
-	if( id < 0 ) {
-		free( copy_to );
-		PSQL_ROLLBACK( conn ); RELEASE( conn );
-		return id;
-	}
-
-	res = psql_write_buf( conn, data->block_size, id, to, from, 0, strlen( from ), data->verbose );
-	if( res < 0 ) {
-		free( copy_to );
-		PSQL_ROLLBACK( conn ); RELEASE( conn );
-		return res;
-	}
-	
-	if( res != strlen( from ) ) {
-		free( copy_to );
-		PSQL_ROLLBACK( conn ); RELEASE( conn );
-		return -EIO;
-	}
-
-	
-	
-	return 0;
-}
-#endif
 
 static int pgfuse_readlink( const char *path, char *buf, size_t size )
 {
