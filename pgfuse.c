@@ -18,7 +18,7 @@
 #include <string.h>		/* for strdup, strlen, memset */
 #include <libgen.h>		/* for POSIX compliant basename */
 #include <unistd.h>		/* for exit */
-#include <stdlib.h>		/* for EXIT_FAILURE, EXIT_SUCCESS */
+#include <stdlib.h>		/* for EXIT_FAILURE, EXIT_SUCCESS, realpath */
 #include <stdio.h>		/* for fprintf */
 #include <stddef.h>		/* for offsetof */
 #include <syslog.h>		/* for openlog, syslog */
@@ -107,6 +107,40 @@ static int psql_release( PgFuseData *data, PGconn *conn )
 	if( psql_release( data, C ) < 0 ) return -EIO;
 
 #define THREAD_ID (unsigned int)pthread_self( )
+
+/* --- other helpers --- */
+
+static int check_mountpoint( char **old_mountpoint )
+{
+	int res = 0;
+	struct stat stat_buf;
+	char *abs_mountpoint;
+	
+	/* use absolute mountpoints, not relative ones */
+	if( ( abs_mountpoint = realpath( *old_mountpoint, NULL ) ) == NULL ) {
+		fprintf( stderr, "unable to call realpath on mountpoint '%s': %s\n",
+			*old_mountpoint, strerror( errno ) );
+		return -1;
+	}
+		
+
+	if( ( res = stat( abs_mountpoint, &stat_buf ) ) < 0 ) {
+		fprintf( stderr, "unable to stat mountpoint '%s': %s\n",
+			abs_mountpoint, strerror( errno ) );
+		return res;
+	}
+
+	/* don't allow anything but a directory as a mount point */
+	if( !(S_ISDIR( stat_buf.st_mode ) ) ) {
+		fprintf( stderr, "mountpoint '%s' is not a directory\n",
+			abs_mountpoint );
+		return -1;
+	}
+	
+	*old_mountpoint = abs_mountpoint;
+	
+	return res;
+}
 
 /* --- implementation of FUSE hooks --- */
 
@@ -1830,14 +1864,14 @@ int main( int argc, char *argv[] )
 		fprintf( stderr, "PQ param integer_datetimes not available?\n"
 		         "You use a too old version of PostgreSQL..can't continue.\n" );
 		PQfinish( conn );
-		return 1;
+		exit( EXIT_FAILURE );
 	}
 	
 	if( strcmp( value, "on" ) != 0 ) {
 		fprintf( stderr, "Expecting UINT64 for timestamps, not doubles. You may use an old version of PostgreSQL (<8.4)\n"
 		         "or PostgreSQL has been compiled with the deprecated compile option '--disable-integer-datetimes'\n" );
 		PQfinish( conn );
-		return 1;
+		exit( EXIT_FAILURE );
 	}
 
 	openlog( basename( argv[0] ), LOG_PID, LOG_USER );	
@@ -1846,16 +1880,25 @@ int main( int argc, char *argv[] )
 	res = psql_get_block_size( conn, pgfuse.block_size );
 	if( res < 0 ) {
 		PQfinish( conn );
-		return 1;
+		exit( EXIT_FAILURE );
 	}
 	if( res != pgfuse.block_size ) {
 		fprintf( stderr, "Blocksize parameter mismatch (is '%zu', in database we have '%zu') taking the later one!\n",
 			pgfuse.block_size, (size_t)res );
 		PQfinish( conn );
-		return 1;
+		exit( EXIT_FAILURE );
 	}
 	
 	PQfinish( conn );
+
+	/* check sanity of the mount point, remember it's permission and owner in
+	 * case we want to inherit them or overrule them
+	 */
+	res = check_mountpoint( &pgfuse.mountpoint );
+	if( res < 0 ) {
+		/* something is fishy, bail out, check_mountpointed reported errors already */
+		exit( EXIT_FAILURE );
+	}
 	
 	memset( &userdata, 0, sizeof( PgFuseData ) );
 	userdata.conninfo = pgfuse.conninfo;
