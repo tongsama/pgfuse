@@ -1,7 +1,7 @@
 Source: pgfuse
 Section: unknown
 Priority: extra
-Maintainer: Andreas Baumann <abaumann@yahoo.com>
+Maintainer: Andreas Baumann <mail@andreasbaumann.cc>
 Build-Depends: debhelper (>= 4.1.16), pkg-config,
  libpq-dev, libfuse-dev
 Standards-Version: 3.8.3
