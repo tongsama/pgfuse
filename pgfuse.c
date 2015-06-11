@@ -1754,9 +1754,9 @@ static void print_usage( char* progname )
 		"    -V   --version         print version\n"
 		"\n"
 		"PgFuse options:\n"
-		"    ro                     mount filesystem read-only, do not change data in database\n"
-		"    noatime                do not try to keep access time up to date on every read (only on close)\n"
-		"    blocksize=<bytes>      block size to use for storage of data\n"
+		"    -o ro                  mount filesystem read-only, do not change data in database\n"
+		"    -o noatime             do not try to keep access time up to date on every read (only on close)\n"
+		"    -o blocksize=<bytes>   block size to use for storage of data\n"
 		"\n",
 		progname
 	);
