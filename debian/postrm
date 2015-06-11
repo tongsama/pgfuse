@@ -2,7 +2,7 @@
 
 # Debian postrm script for pgfuse
 
-# Author: Andreas Baumann <abaumann@yahoo.com>
+# Author: Andreas Baumann <mail@andreasbaumann.cc>
 
 # summary of how this script can be called:
 #        * <postrm> `remove'

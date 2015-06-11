@@ -223,5 +223,5 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/%{name}-%{version}/schema.sql
 
 %changelog
-* Fri Apr 20 2012 Andreas Baumann <abaumann@yahoo.com> 0.0.1-0.1
+* Fri Apr 20 2012 Andreas Baumann <mail@andreasbaumann.cc> 0.0.1-0.1
 - preliminary release
