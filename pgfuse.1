@@ -70,6 +70,11 @@ overruled to allow only read operations.
 \fB-o\fR noatime (default=false)
 The default is to keep track of access times on reads. This can be
 switched off with noatime.
+.TP
+\fB-o\fR blocksize=<bytes> (default=4096)
+Store blocks of size <blocksize>. Do not change this while having
+data in your filesystem, otherwise you can't access it anymore!
+This is useful for special cases and performance testing.
 .SS "FUSE/Mount options"
 For a list of possible mount and FUSE options consult the manpage
 of \fBmount\fR and the README file of the \fBfuse\fR source package.
