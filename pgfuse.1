@@ -55,6 +55,11 @@ For more options have a look at the documentation of \fBlibpq\fR
 in function \fBPQconnectdb\fR.
 .TP
 \fBExample\fR: "host=foo.lan dbname=test user=test"
+.TP
+\fBNote\fR: When adding a permanent mount point to \fB/etc/fstab\fR
+you have to escape the spaces with \fB\\040\fR, for example:
+.TP
+pgfuse#host=localhost\\040dbname=testdb\\040user=testuser /mnt/pgfuse fuse defaults 0 0
 .SS "Fuse and PgFuse options"
 Options are the normal FUSE options plus the special PgFuse options:
 .TP
