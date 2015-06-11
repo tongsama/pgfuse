@@ -549,6 +549,15 @@ static int pgfuse_readdir( const char *path, void *buf, fuse_fill_dir_t filler,
 		PSQL_ROLLBACK( conn ); RELEASE( conn );
 		return res;
 	}
+
+	if( !data->noatime ) {
+		meta.atime = now( );
+		res = psql_write_meta( conn, id, path, meta );
+		if( res < 0 ) {
+			PSQL_ROLLBACK( conn ); RELEASE( conn );
+			return res;
+		}
+	}	
 	
 	PSQL_COMMIT( conn ); RELEASE( conn );
 	
@@ -691,6 +700,9 @@ static int pgfuse_rmdir( const char *path )
 		return res;
 	}
 	
+	// TODO: update ctime/mtime of parent directory, have functions to
+	// get the parent directory
+	
 	PSQL_COMMIT( conn ); RELEASE( conn );
 	
 	return 0;
@@ -737,6 +749,9 @@ static int pgfuse_unlink( const char *path )
 		PSQL_ROLLBACK( conn ); RELEASE( conn );
 		return res;
 	}
+
+	// TODO: update ctime/mtime of parent directory, have functions to
+	// get the parent directory
 	
 	PSQL_COMMIT( conn ); RELEASE( conn );
 	
@@ -785,6 +800,32 @@ static int pgfuse_release( const char *path, struct fuse_file_info *fi )
 		syslog( LOG_INFO, "Releasing '%s' on '%s', thread #%u",
 			path, data->mountpoint, THREAD_ID );
 	}
+
+	if( !data->noatime ) {
+		int64_t id;
+		int res;
+		PgMeta meta;
+		PGconn *conn;
+
+		ACQUIRE( conn );
+		PSQL_BEGIN( conn );
+		
+		id = psql_read_meta_from_path( conn, path, &meta );
+		if( id < 0 ) {
+			PSQL_ROLLBACK( conn ); RELEASE( conn );
+			return id;
+		}
+		
+		meta.atime = now( );
+		
+		res = psql_write_meta( conn, id, path, meta );
+		if( res < 0 ) {
+			PSQL_ROLLBACK( conn ); RELEASE( conn );
+			return res;
+		}
+
+		PSQL_COMMIT( conn ); RELEASE( conn );
+	}	
 
 	return 0;
 }
@@ -947,6 +988,9 @@ static int pgfuse_truncate( const char* path, off_t offset )
 	}
 	
 	meta.size = offset;
+	meta.ctime = now( );
+	meta.mtime = meta.ctime;
+	
 	res = psql_write_meta( conn, id, path, meta );
 	if( res < 0 ) {
 		PSQL_ROLLBACK( conn ); RELEASE( conn );
@@ -998,7 +1042,8 @@ static int pgfuse_ftruncate( const char *path, off_t offset, struct fuse_file_in
 	}
 	
 	meta.size = offset;
-	meta.mtime = now( );
+	meta.ctime = now( );
+	meta.mtime = meta.ctime;
 	
 	res = psql_write_meta( conn, fi->fh, path, meta );
 	if( res < 0 ) {
@@ -1354,12 +1399,18 @@ static int pgfuse_symlink( const char *from, const char *to )
 		return -EIO;
 	}
 
+	// TODO: update ctime/mtime of parent directory, have functions to
+	// get the parent directory
+	
 	free( copy_to );
 	
 	PSQL_COMMIT( conn ); RELEASE( conn );
 	
 	return 0;
 }
+
+// TODO: handle mtime/ctime of original and receiving folder, handle
+// mtime/ctime of file/directory being moved
 
 static int pgfuse_rename( const char *from, const char *to )
 {
