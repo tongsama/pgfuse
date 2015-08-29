@@ -2,7 +2,7 @@ all: pgfuse
 
 # name and version of package
 PACKAGE_NAME = pgfuse
-PACKAGE_VERSION = 0.0.1
+PACKAGE_VERSION = 0.0.2
 
 # installation dirs
 DESTDIR=
