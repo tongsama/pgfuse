@@ -170,7 +170,7 @@ PgFuse stores a whole filesystem in a set of database tables in a
 PostgreSQL database. This is done using the FUSE API.
 
 %prep
-%setup
+%setup -n %{name}-%{main_version}
 
 %build
 
