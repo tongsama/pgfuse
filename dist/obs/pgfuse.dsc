@@ -1,4 +1,4 @@
-Format: 1.0
+Format: 3.0 (quilt)
 Source: pgfuse
 Version: 0.0.2
 Binary: pgfuse
