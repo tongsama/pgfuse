@@ -306,7 +306,18 @@ static char *flags_to_string( int flags )
 	s = (char *)malloc( 100 );
 	if( s == NULL ) return "<memory allocation failed>";
 
-	snprintf( s, 100, "access_mode=%s, flags=%s%s%s%s%s%s%s",
+	snprintf( s, 100, "access_mode=%s, flags=%s%s%s%s"
+#ifdef O_NOFOLLOW
+"%s"
+#endif
+#ifdef O_CLOEXEC
+"%s"
+#endif
+#ifdef O_DIRECTORY
+"%s"
+#endif
+		"%s",
+                ( flags & O_EXCL ) ? "O_EXCL " : "",
 		mode_s,
 		( flags & O_CREAT ) ? "O_CREAT " : "",
 		( flags & O_TRUNC ) ? "O_TRUNC " : "",
