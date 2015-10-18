@@ -31,6 +31,7 @@
 #include <mntent.h>		/* for iterating mount entries */
 #include <sys/vfs.h>		/* for statfs */
 #include <limits.h>
+#include <fcntl,h>		/* for O_NOFOLLOW, etc */
 
 #include <fuse.h>		/* for user-land filesystem */
 #include <fuse_opt.h>		/* fuse command line parser */
