@@ -1,0 +1,11 @@
+pgfuse (0.0.2-1) unstable; urgency=low
+
+  * release 0.0.2
+
+ -- Andreas Baumann <mail@andreasbaumann.cc>  Sat, 27 Aug 2015 11:30:40 +0200
+
+pgfuse (0.0.1-1) unstable; urgency=low
+
+  * preliminary release
+
+ -- Andreas Baumann <mail@andreasbaumann.cc>  Fri, 20 Apr 2012 17:48:00 +0200

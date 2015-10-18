@@ -1,0 +1,29 @@
+# Contributor: Andreas Baumann <mail@andreasbaumann.cc>
+# Maintainer: Andreas Baumann <mail@andreasbaumann.cc>
+
+pkgname=pgfuse
+_mainpkgver=0.0.2
+pkgver=${_mainpkgver}
+pkgrel=1
+pkgdesc="FUSE-based file system with a PostgreSQL storage backend"
+url="https://github.com/andreasbaumann/pgfuse"
+license=('GPL3')
+arch=('i686' 'x86_64')
+depends=('fuse' 'postgresql-libs')
+makedepends=('pkg-config')
+source=("${pkgname}-${_mainpkgver}.tar.gz")
+md5sums=('ed6fb841d79425806cf059c9561b799e')
+
+build() {
+	cd ${srcdir}/${pkgname}-${_mainpkgver}
+
+	msg "Building..."
+	make
+}
+
+package() {
+	cd ${srcdir}/${pkgname}-${_mainpkgver}
+
+	msg "Installing.."
+	make DESTDIR=$pkgdir install
+}

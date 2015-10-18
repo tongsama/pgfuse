@@ -63,90 +63,57 @@
 %endif
 
 %define fedora 0
-%define fc14 0
-%if 0%{?fedora_version} == 14
-%define dist fc14
-%define fc14 1
-%define fedora 1
-%endif
-%define fc15 0  
-%if 0%{?fedora_version} == 15
-%define dist fc15
-%define fc15 1
-%define fedora 1
-%endif
-%define fc16 0  
-%if 0%{?fedora_version} == 16
-%define dist fc16
-%define fc16 1   
-%define fedora 1
-%endif
-%define fc17 0  
-%if 0%{?fedora_version} == 17
-%define dist fc17
-%define fc17 1
-%define fedora 1
-%endif
-%define fc18 0  
-%if 0%{?fedora_version} == 18
-%define dist fc18
-%define fc18 1
-%define fedora 1
-%endif
-%define fc19 0  
-%if 0%{?fedora_version} == 19
-%define dist fc19
-%define fc19 1
-%define fedora 1
-%endif
-%define fc20 0  
-%if 0%{?fedora_version} == 20
-%define dist fc20
-%define fc20 1
-%define fedora 1
-%endif
-%define fc21 0  
+%define fc21 0
+%define fc22 0
 %if 0%{?fedora_version} == 21
 %define dist fc21
 %define fc21 1
 %define fedora 1
 %endif
+%if 0%{?fedora_version} == 22
+%define dist fc22
+%define fc22 1
+%define fedora 1
+%endif
 
 %define suse 0
-%define osu114 0
-%define osu121 0
-%define osu122 0
 %define osu131 0
-%if 0%{?suse_version} == 1140
-%define dist osu114
-%define osu114 1
-%define suse 1
-%endif
-%if 0%{?suse_version} == 1210
-%define dist osu121
-%define osu121 1
-%define suse 1
-%endif
-%if 0%{?suse_version} >= 1220
-%define dist osu122
-%define osu122 1
-%define suse 1
-%endif
-%if 0%{?suse_version} >= 1310
+%define osu132 0
+%define osufactory 0
+%if 0%{?suse_version} == 1310
 %define dist osu131
 %define osu131 1
 %define suse 1
 %endif
+%if 0%{?suse_version} == 1320
+%define dist osu132
+%define osu132 1
+%define suse 1
+%endif
+%if 0%{?suse_version} > 1320
+%define dist osufactory
+%define osufactory 1
+%define suse 1
+%endif
 
 %define sles 0
-%if 0%{?sles_version} == 11
+%define sles11 0
+%define sles12 0
+%if 0%{?suse_version} == 1110
 %define dist sle11
+%define sles11 1
+%define sles 1
+%endif
+%if 0%{?suse_version} == 1315 
+%define dist sle12
+%define sles12 1
 %define sles 1
 %endif
 
 Summary: Stores files in a PostgreSQL database using the FUSE API
 Name: pgfuse
-Version: 0.0.1
+%define main_version 0.0.2
+Version: %{main_version}
 Release: 0.1
 License: GPLv3
 Group: System/Filesystems
@@ -223,5 +190,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/%{name}-%{version}/schema.sql
 
 %changelog
-* Fri Apr 20 2012 Andreas Baumann <mail@andreasbaumann.cc> 0.0.1-0.1
+* Sat Aug 27 2015 Andreas Baumann <abaumann@yahoo.com> 0.0.2-0.1
+- release 0.0.2
+
+* Fri Apr 20 2012 Andreas Baumann <abaumann@yahoo.com> 0.0.1-0.1
 - preliminary release
