@@ -118,7 +118,7 @@ Release: 0.1
 License: GPLv3
 Group: System/Filesystems
 
-Source: %{name}_%{version}.tar.gz
+Source: %{name}_%{main_version}.tar.gz
 
 URL: https://github.com/andreasbaumann/pgfuse
 

@@ -1,6 +1,6 @@
 Format: 1.0
 Source: pgfuse
-Version: 0.0.1
+Version: 0.0.2
 Binary: pgfuse
 Maintainer: Andreas Baumann <mail@andreasbaumann.cc>
 Architecture: any
