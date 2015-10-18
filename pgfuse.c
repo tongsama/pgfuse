@@ -311,9 +311,15 @@ static char *flags_to_string( int flags )
 		( flags & O_CREAT ) ? "O_CREAT " : "",
 		( flags & O_TRUNC ) ? "O_TRUNC " : "",
 		( flags & O_EXCL ) ? "O_EXCL " : "",
+#ifdef O_NOFOLLOW
 		( flags & O_NOFOLLOW ) ? "O_NOFOLLOW " : "",
+#endif
+#ifdef O_CLOEXEC
 		( flags & O_CLOEXEC ) ? "O_CLOEXEC " : "",
+#endif
+#ifdef O_DIRECTORY
 		( flags & O_DIRECTORY ) ? "O_DIRECTORY " : "",
+#endif
 		( flags & O_APPEND ) ? "O_APPEND " : "" );
 	
 	return s;
