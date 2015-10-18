@@ -1,3 +1,5 @@
+.PHONY: all clean dist dist-gz install test
+
 all: pgfuse
 
 # name and version of package
